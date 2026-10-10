@@ -11,9 +11,9 @@ async function load(){try{const data=await request('/api/tasks');tasks=data.task
 function linkNode(link){const a=el('a','',link.name);if(link.kind==='document'&&link.url.startsWith('/documents/')){a.href=link.url;a.download='';}else if(link.kind==='cloud-document'){a.href='#';a.onclick=async e=>{e.preventDefault();try{await window.downloadDocument(link);}catch(err){toast(err.message);}};}else{try{const url=new URL(link.url);if(!['http:','https:'].includes(url.protocol))return el('span','','无效链接');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';}catch{return el('span','','无效链接');}}return a;}
 function periodControl(t){const label=el('label','period-control'),select=el('select');label.append(el('span','','周期分类'));select.setAttribute('aria-label',t.id+' 周期分类');for(const value of periods){const option=el('option','',value==='事项'?'事项提醒（单次）':value);option.value=value;select.append(option);}select.value=periods.includes(t.period)?t.period:'事项';select.disabled=busy;select.onchange=()=>changePeriod(t.id,select.value,select,t.period);label.append(select);return label;}
 async function changePeriod(id,value,select,previous){if(busy){select.value=previous;return;}busy=true;select.disabled=true;try{await request('/api/period',{id,period:value});await load();toast(id+' 已归入'+(value==='事项'?'事项提醒':value));}catch(err){select.value=previous;toast('分类未保存：'+err.message);}finally{busy=false;select.disabled=false;}}
-function render(){for(const [category,id] of [['active','active-count'],['done','done-count'],['waiting','wait-count']])$(id).textContent=tasks.filter(t=>personal(t)&&kind(t)===category).length;
+function render(){const scoped=tasks.filter(t=>personal(t)&&(period==='全部'||t.period===period));for(const [category,id] of [['active','active-count'],['done','done-count'],['waiting','wait-count']])$(id).textContent=scoped.filter(t=>kind(t)===category).length;
  const query=$('search').value.toLowerCase(),filter=$('filter').value;
- document.querySelectorAll('.stat-button').forEach(b=>{const active=b.dataset.filter===filter&&period==='全部'&&!query;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});
+ document.querySelectorAll('.stat-button').forEach(b=>{const active=b.dataset.filter===filter&&!query;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));b.setAttribute('aria-label',(period==='全部'?'全部事项':period)+'：'+b.textContent.trim());});
  const visible=tasks.filter(t=>personal(t)&&(filter==='personal'||kind(t)===filter)&&(period==='全部'||t.period===period)&&[t.id,t.title,t.notes].join(' ').toLowerCase().includes(query)).sort((a,b)=>Number(a.id.slice(1))-Number(b.id.slice(1)));
  $('list-title').textContent=filter==='active'?'未完成事项':{'done':'已完成事项','waiting':'等待结果','paused':'已暂停 / 已归档','personal':'全部个人事项'}[filter];$('visible-count').textContent=`共 ${visible.length} 项 · 编号升序`;
  $('list').replaceChildren();if(!visible.length)$('list').append(el('div','empty','没有符合条件的事项'));
@@ -33,5 +33,5 @@ window.refreshBoard=load;
 
 
 window.completeBoardTask=changeStatus;
-document.querySelectorAll('.stat-button').forEach(button=>button.onclick=()=>{period='全部';$('search').value='';$('filter').value=button.dataset.filter;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.period==='全部'));render();$('list-title').scrollIntoView({block:'start'});});
+document.querySelectorAll('.stat-button').forEach(button=>button.onclick=()=>{$('search').value='';$('filter').value=button.dataset.filter;render();$('list-title').scrollIntoView({block:'start'});});
 
